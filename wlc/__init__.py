@@ -133,22 +133,22 @@ class Weblate:
                 "HTTP error {0}: {1} {2}".format(status_code, reason, error_string)
             )
 
-    def raw_request(self, method, path, params=None, files=None):
+    def raw_request(self, method, path, data=None, files=None, params=None):
         """Construct request object and returns raw content."""
-        response = self.invoke_request(method, path, params, files)
+        response = self.invoke_request(method, path, data, files, params=params)
 
         return response.content
 
-    def request(self, method, path, params=None, files=None):
+    def request(self, method, path, data=None, files=None, params=None):
         """Construct request object and returns json response."""
-        response = self.invoke_request(method, path, params, files)
+        response = self.invoke_request(method, path, data, files, params=params)
 
         try:
             return response.json()
         except ValueError:
             raise WeblateException("Server returned invalid JSON")
 
-    def invoke_request(self, method, path, data=None, files=None, params={}):
+    def invoke_request(self, method, path, data=None, files=None, params=None):
         """Construct request object."""
         if not path.startswith("http"):
             path = "{0}{1}".format(self.url, path)
@@ -156,13 +156,19 @@ class Weblate:
         if self.key:
             headers["Authorization"] = "Token {}".format(self.key)
         verify_ssl = self._should_verify_ssl(path)
-        data = json = None
+        kwargs = {
+            "headers": headers,
+            "verify": verify_ssl,
+            "files": files,
+        }
+        if params:
+            kwargs["params"] = params
         if files:
             # mulitpart/form upload
-            data = params
+            kwargs["data"] = data
         else:
             # JSON params to handle complex structures
-            json = params
+            kwargs["json"] = data
         try:
             req = requests.Session()
             retries = Retry(
@@ -177,11 +183,7 @@ class Weblate:
             response = requests.request(
                 method,
                 path,
-                headers=headers,
-                verify=verify_ssl,
-                files=files,
-                data=data,
-                json=json,
+                **kwargs
             )
             response.raise_for_status()
         except requests.exceptions.RequestException as error:
@@ -197,11 +199,11 @@ class Weblate:
         """Wrapper for posting objects."""
         return self.post("/".join((prefix, path, "")), **kwargs)
 
-    def get(self, path, params={}):
+    def get(self, path, params=None):
         """Perform GET request on the API."""
         return self.request("get", path, params=params)
 
-    def list_factory(self, path, parser, params={}):
+    def list_factory(self, path, parser, params=None):
         """Listing object wrapper."""
         while path is not None:
             data = self.get(path, params=params)
@@ -262,7 +264,7 @@ class Weblate:
         """List changes in the instance."""
         return self.list_factory(path, Change)
 
-    def list_units(self, path, params={}):
+    def list_units(self, path, params=None):
         """List units in the instance."""
         return self.list_factory(path, Unit, params=params)
 
@@ -713,7 +715,7 @@ class Translation(LazyObject, RepoObjectMixin):
         return self.weblate.request("post", url, files=files, data=kwargs)
 
     def delete(self):
-        return self.weblate.raw_request("delete", self._url)
+        self.weblate.raw_request("delete", self._url)
 
     def units(self, **kwargs):
         """List units in the translation."""

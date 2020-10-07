@@ -262,7 +262,7 @@ class ObjectTestBaseClass:
         self.check_list(obj.list())
 
 
-class ObjectTest (ObjectTestBaseClass):
+class ObjectTest (ObjectTestBaseClass, APITest):
     """Additional tests for projects, components, and translations"""
 
     def test_refresh(self):
@@ -540,3 +540,6 @@ class UnitTest(ObjectTestBaseClass, APITest):
     #     }
     #     resp = obj.patch(**patch_data)
     #     self.assertEqual(resp, patch_data)
+
+del ObjectTest
+del ObjectTestBaseClass
