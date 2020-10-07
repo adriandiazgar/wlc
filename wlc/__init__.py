@@ -92,6 +92,7 @@ class Weblate:
                     "HEAD",
                     "GET",
                     "PUT",
+                    "PATCH",
                     "DELETE",
                     "OPTIONS",
                     "TRACE",
@@ -147,7 +148,7 @@ class Weblate:
         except ValueError:
             raise WeblateException("Server returned invalid JSON")
 
-    def invoke_request(self, method, path, params=None, files=None):
+    def invoke_request(self, method, path, data=None, files=None, params={}):
         """Construct request object."""
         if not path.startswith("http"):
             path = "{0}{1}".format(self.url, path)
@@ -196,14 +197,14 @@ class Weblate:
         """Wrapper for posting objects."""
         return self.post("/".join((prefix, path, "")), **kwargs)
 
-    def get(self, path):
+    def get(self, path, params={}):
         """Perform GET request on the API."""
-        return self.request("get", path)
+        return self.request("get", path, params=params)
 
-    def list_factory(self, path, parser):
+    def list_factory(self, path, parser, params={}):
         """Listing object wrapper."""
         while path is not None:
-            data = self.get(path)
+            data = self.get(path, params=params)
             for item in data["results"]:
                 yield parser(weblate=self, **item)
 
@@ -220,6 +221,11 @@ class Weblate:
         Operates on (project, component or translation objects.
         """
         parts = path.strip("/").split("/")
+        try:
+            int(path)
+            return self.get_unit(path)
+        except ValueError:
+            pass
         if len(parts) == 3:
             return self.get_translation(path)
         if len(parts) == 2:
@@ -240,6 +246,10 @@ class Weblate:
         """Return translation of given path."""
         return self._get_factory("translations", path, Translation)
 
+    def get_unit(self, path):
+        """Return unit of given path."""
+        return self._get_factory("units", path, Unit)
+
     def list_projects(self, path="projects/"):
         """List projects in the instance."""
         return self.list_factory(path, Project)
@@ -249,8 +259,12 @@ class Weblate:
         return self.list_factory(path, Component)
 
     def list_changes(self, path="changes/"):
-        """List components in the instance."""
+        """List changes in the instance."""
         return self.list_factory(path, Change)
+
+    def list_units(self, path, params={}):
+        """List units in the instance."""
+        return self.list_factory(path, Unit, params=params)
 
     def list_translations(self, path="translations/"):
         """List translations in the instance."""
@@ -675,7 +689,7 @@ class Translation(LazyObject, RepoObjectMixin):
         return TranslationStatistics(weblate=self.weblate, **data)
 
     def changes(self):
-        """List changes in the project."""
+        """List changes in the translation."""
         self.ensure_loaded("changes_list_url")
         return self.weblate.list_changes(self._attribs["changes_list_url"])
 
@@ -696,10 +710,16 @@ class Translation(LazyObject, RepoObjectMixin):
         if overwrite:
             kwargs["overwrite"] = "yes"
 
-        return self.weblate.request("post", url, files=files, params=kwargs)
+        return self.weblate.request("post", url, files=files, data=kwargs)
 
     def delete(self):
-        self.weblate.raw_request("delete", self._url)
+        return self.weblate.raw_request("delete", self._url)
+
+    def units(self, **kwargs):
+        """List units in the translation."""
+        self.ensure_loaded("units_list_url")
+        return self.weblate.list_units(self._attribs["units_list_url"],
+                                       params=kwargs)
 
 
 class Statistics(LazyObject):
@@ -740,3 +760,52 @@ class Change(LazyObject):
     )
     ID = "id"
     MAPPINGS = {"translation": Translation, "component": Component}
+
+
+class Unit(LazyObject):
+    """Unit object."""
+
+    PARAMS = (
+        "approved",
+        "content_hash",
+        "context",
+        "explanation",
+        "extra_flags",
+        "flags",
+        "fuzzy",
+        "has_comment",
+        "has_failing_check",
+        "has_suggestion",
+        "id",
+        "id_hash",
+        "location",
+        "note",
+        "num_words",
+        "position",
+        "previous_source",
+        "priority",
+        "source",
+        "source_unit",
+        "state",
+        "target",
+        "translated",
+        "translation",
+        "url",
+        "web_url",
+    )
+    ID = "id"
+    MAPPINGS = {"translation": Translation}
+
+    def list(self):
+        """API compatibility method, returns self."""
+        self.ensure_loaded("id")
+        return self
+
+    def patch(self, **kwargs):
+        return self.weblate.raw_request("patch", self._url, params=kwargs)
+
+    def put(self, **kwargs):
+        return self.weblate.raw_request("put", self._url, params=kwargs)
+
+    def delete(self):
+        return self.weblate.raw_request("delete", self._url)
