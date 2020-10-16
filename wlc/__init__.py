@@ -25,6 +25,7 @@ import dateutil.parser
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+import json
 
 __version__ = "1.9.1b0"
 
@@ -180,11 +181,9 @@ class Weblate:
             )
             for protocol in ["http", "https"]:
                 req.mount(f"{protocol}://", HTTPAdapter(max_retries=retries))
-            response = requests.request(
-                method,
-                path,
-                **kwargs
-            )
+            kwargs["timeout"] = None
+            print(json.dumps([method, path, kwargs], indent=True))
+            response = requests.request(method, path, **kwargs)
             response.raise_for_status()
         except requests.exceptions.RequestException as error:
             self.process_error(error)
@@ -720,8 +719,7 @@ class Translation(LazyObject, RepoObjectMixin):
     def units(self, **kwargs):
         """List units in the translation."""
         self.ensure_loaded("units_list_url")
-        return self.weblate.list_units(self._attribs["units_list_url"],
-                                       params=kwargs)
+        return self.weblate.list_units(self._attribs["units_list_url"], params=kwargs)
 
 
 class Statistics(LazyObject):

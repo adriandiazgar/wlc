@@ -262,7 +262,7 @@ class ObjectTestBaseClass:
         self.check_list(obj.list())
 
 
-class ObjectTest (ObjectTestBaseClass, APITest):
+class ObjectTest(ObjectTestBaseClass, APITest):
     """Additional tests for projects, components, and translations"""
 
     def test_refresh(self):
@@ -513,7 +513,7 @@ class TranslationTest(ObjectTest):
 
     def test_units_search(self):
         obj = self.get()
-        units = list(obj.units(q="source:=\"mr\""))
+        units = list(obj.units(q='source:="mr"'))
         self.assertEqual(1, len(units))
         self.assertIsInstance(units[0], Unit)
         self.assertEqual(units[0].id, 117)
@@ -540,6 +540,7 @@ class UnitTest(ObjectTestBaseClass, APITest):
     #     }
     #     resp = obj.patch(**patch_data)
     #     self.assertEqual(resp, patch_data)
+
 
 del ObjectTest
 del ObjectTestBaseClass
